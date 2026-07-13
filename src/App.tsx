@@ -1,0 +1,17 @@
+import HeroSection from './sections/HeroSection';
+import StorySection from './sections/StorySection';
+import ServicesSection from './sections/ServicesSection';
+import ProjectsSection from './sections/ProjectsSection';
+
+function App() {
+  return (
+    <div className="bg-[#0C0C0C]" style={{ overflowX: 'clip' }}>
+      <HeroSection />
+      <StorySection />
+      <ServicesSection />
+      <ProjectsSection />
+    </div>
+  );
+}
+
+export default App;

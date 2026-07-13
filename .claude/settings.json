@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx eslint *)",
+      "Bash(npx --yes chromium-cli --help)",
+      "Bash(npm ls *)",
+      "Bash(find /private/tmp/claude-501/bundled-skills -iname \"*chromium*\" 2>/dev/null | head -20)",
+      "Read(//private/tmp/claude-501/bundled-skills/**)",
+      "Bash(npx playwright *)",
+      "Bash(node /private/tmp/claude-501/-Users-vinicius-lp01/c41fd9fa-7bbf-4245-9e98-6091fe0b0e18/scratchpad/check_hero.mjs)",
+      "Bash(node /Users/vinicius/lp01/_tmp_check_hero.mjs)",
+      "Bash(NODE_PATH=/Users/vinicius/.npm/_npx/e41f203b7505f1fb/node_modules node /Users/vinicius/lp01/_tmp_check_hero.mjs)",
+      "Bash(ln -s /Users/vinicius/.npm/_npx/e41f203b7505f1fb/node_modules/playwright /Users/vinicius/lp01/node_modules/playwright)",
+      "Bash(ln -sf /Users/vinicius/.npm/_npx/e41f203b7505f1fb/node_modules/playwright-core /Users/vinicius/lp01/node_modules/playwright-core)",
+      "Bash(node /Users/vinicius/lp01/_tmp_check_scroll.mjs)",
+      "Bash(rm -f /Users/vinicius/lp01/node_modules/playwright /Users/vinicius/lp01/node_modules/playwright-core)",
+      "Bash(pkill -f \"vite\")",
+      "Bash(git -C /Users/vinicius/lp01 status --short)",
+      "Bash(git revert *)"
+    ]
+  }
+}
