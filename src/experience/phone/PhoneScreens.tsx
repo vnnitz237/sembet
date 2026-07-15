@@ -5,24 +5,17 @@ import ScreenSOS        from './screens/ScreenSOS';
 import ScreenProgress   from './screens/ScreenProgress';
 import ScreenGuardian   from './screens/ScreenGuardian';
 
-/** All internal phone elements that ExperienceStage needs to animate. */
 export interface PhoneScreensHandle {
-  screenHomeEl:       HTMLDivElement | null;
-  screenProtectionEl: HTMLDivElement | null;
-  screenSOSEl:        HTMLDivElement | null;
-  screenProgressEl:   HTMLDivElement | null;
-  screenGuardianEl:   HTMLDivElement | null;
   protectionCardEl:   HTMLDivElement | null;
   screenContentEl:    HTMLDivElement | null;
+  /* secondary elements for Act 3 individual targeting */
+  greetingEl:         HTMLDivElement | null;
+  counterEl:          HTMLDivElement | null;
+  supportEl:          HTMLButtonElement | null;
+  metricsEl:          HTMLDivElement | null;
+  navEl:              HTMLElement | null;
 }
 
-/**
- * PhoneScreens — renders ALL screens simultaneously in the DOM.
- *
- * Every screen is absolutely positioned and stacked.
- * Visibility is controlled exclusively by GSAP (opacity / clip-path / filter).
- * No React state is used to decide which screen is active.
- */
 const PhoneScreens = forwardRef<PhoneScreensHandle, object>((_, ref) => {
   const screenHomeRef       = useRef<ScreenHomeHandle>(null);
   const screenProtectionRef = useRef<HTMLDivElement>(null);
@@ -31,31 +24,35 @@ const PhoneScreens = forwardRef<PhoneScreensHandle, object>((_, ref) => {
   const screenGuardianRef   = useRef<HTMLDivElement>(null);
 
   useImperativeHandle(ref, () => ({
-    get screenHomeEl()       { return screenHomeRef.current?.screenContentEl?.parentElement as HTMLDivElement | null ?? null; },
-    get screenProtectionEl() { return screenProtectionRef.current; },
-    get screenSOSEl()        { return screenSOSRef.current; },
-    get screenProgressEl()   { return screenProgressRef.current; },
-    get screenGuardianEl()   { return screenGuardianRef.current; },
-    get protectionCardEl()   { return screenHomeRef.current?.protectionCardEl ?? null; },
-    get screenContentEl()    { return screenHomeRef.current?.screenContentEl ?? null; },
+    get protectionCardEl() { return screenHomeRef.current?.protectionCardEl ?? null; },
+    get screenContentEl()  { return screenHomeRef.current?.screenContentEl  ?? null; },
+    get greetingEl()       { return screenHomeRef.current?.greetingEl       ?? null; },
+    get counterEl()        { return screenHomeRef.current?.counterEl        ?? null; },
+    get supportEl()        { return screenHomeRef.current?.supportEl        ?? null; },
+    get metricsEl()        { return screenHomeRef.current?.metricsEl        ?? null; },
+    get navEl()            { return screenHomeRef.current?.navEl            ?? null; },
   }));
+
+  // screenProtectionRef etc. kept for future acts
+  void screenProtectionRef;
+  void screenSOSRef;
+  void screenProgressRef;
+  void screenGuardianRef;
 
   return (
     <>
-      {/* Home screen — visible in Acts 1–3 */}
       <ScreenHome ref={screenHomeRef} />
 
-      {/* Future screens — hidden, aria-hidden, no tab focus */}
-      <div ref={screenProtectionRef} aria-hidden="true" tabIndex={-1} style={{ position: 'absolute', inset: 0 }}>
+      <div aria-hidden="true" tabIndex={-1} style={{ position: 'absolute', inset: 0 }}>
         <ScreenProtection />
       </div>
-      <div ref={screenSOSRef} aria-hidden="true" tabIndex={-1} style={{ position: 'absolute', inset: 0 }}>
+      <div aria-hidden="true" tabIndex={-1} style={{ position: 'absolute', inset: 0 }}>
         <ScreenSOS />
       </div>
-      <div ref={screenProgressRef} aria-hidden="true" tabIndex={-1} style={{ position: 'absolute', inset: 0 }}>
+      <div aria-hidden="true" tabIndex={-1} style={{ position: 'absolute', inset: 0 }}>
         <ScreenProgress />
       </div>
-      <div ref={screenGuardianRef} aria-hidden="true" tabIndex={-1} style={{ position: 'absolute', inset: 0 }}>
+      <div aria-hidden="true" tabIndex={-1} style={{ position: 'absolute', inset: 0 }}>
         <ScreenGuardian />
       </div>
     </>

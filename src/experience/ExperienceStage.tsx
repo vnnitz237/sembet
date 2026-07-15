@@ -8,8 +8,8 @@ import FloatingAppCard from '../components/hero/FloatingAppCard';
 import PhoneShell      from './phone/PhoneShell';
 import PhoneScreens, { type PhoneScreensHandle } from './phone/PhoneScreens';
 import Act01Intro      from './acts/Act01Intro';
-import Act03Protection from './acts/Act03Protection';
-import { L, ST_DESKTOP, ST_MOBILE, getPhoneX, dur } from './ExperienceTimeline';
+import Act03Protection, { type Act03ProtectionHandle } from './acts/Act03Protection';
+import { L, TOTAL_DURATION, ST_DESKTOP, ST_MOBILE, getPhoneX, dur } from './ExperienceTimeline';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -42,13 +42,11 @@ function SceneBackground() {
 
 /* ─────────────────────────────────────────────────────────────────────────────
    ExperienceStage
-   Receives the outer scroll container ref so ScrollTrigger can pin the stage
-   and track the full-height container.
 ───────────────────────────────────────────────────────────────────────────── */
 export default function ExperienceStage({ containerRef }: { containerRef: React.RefObject<HTMLDivElement> }) {
   const stageRef = useRef<HTMLDivElement>(null);
 
-  /* Desktop refs */
+  /* ── Desktop refs ──────────────────────────────────────────────────────── */
   const sRef            = useRef<HTMLDivElement>(null);
   const phoneRef        = useRef<HTMLDivElement>(null);
   const phoneScreensRef = useRef<PhoneScreensHandle>(null);
@@ -57,10 +55,13 @@ export default function ExperienceStage({ containerRef }: { containerRef: React.
   const card2Ref        = useRef<HTMLDivElement>(null);
   const card3Ref        = useRef<HTMLDivElement>(null);
   const cueRef          = useRef<HTMLDivElement>(null);
-  const calloutRef      = useRef<HTMLDivElement>(null);
-  const connectorRef    = useRef<SVGSVGElement>(null);
 
-  /* Mobile refs — SEPARATE to avoid ref collision */
+  /* ── Act 3 callout layer — lives in the desktop section, outside PhoneShell */
+  const calloutContainerRef = useRef<HTMLDivElement>(null);
+  const calloutInnerRef     = useRef<Act03ProtectionHandle>(null);
+  const connectorRef        = useRef<SVGSVGElement>(null);
+
+  /* ── Mobile refs — completely separate, no collision with desktop ───────── */
   const mPhoneRef = useRef<HTMLDivElement>(null);
   const mCopyRef  = useRef<HTMLDivElement>(null);
   const mCueRef   = useRef<HTMLDivElement>(null);
@@ -74,36 +75,58 @@ export default function ExperienceStage({ containerRef }: { containerRef: React.
     const reduced   = window.matchMedia('(prefers-reduced-motion:reduce)').matches;
     const isDesktop = window.matchMedia('(min-width:1024px)').matches;
 
-    /* ── SVG connector updater ──────────────────────────────────────────── */
-    const updateConnector = () => {
-      const protCardEl = phoneScreensRef.current?.protectionCardEl;
-      if (!protCardEl || !calloutRef.current || !connectorRef.current) return;
-      const pathEl = connectorRef.current.querySelector<SVGPathElement>('path');
+    /* ── updateConnectorGeometry ──────────────────────────────────────────
+       Calculates the SVG path between the protection card's right edge and
+       the callout container's left edge. Also aligns the callout Y to the
+       card's vertical centre.
+
+       Called via the connector tween's functional FROM value — this executes
+       exactly when scroll reaches protectionFocus, at which point the phone
+       is stable at scale 1.28, centred. getBoundingClientRect is accurate.
+
+       Does NOT set strokeDashoffset — GSAP tween owns that property.
+    ──────────────────────────────────────────────────────────────────────── */
+    const updateConnectorGeometry = () => {
+      const protCardEl  = phoneScreensRef.current?.protectionCardEl;
+      const calloutCont = calloutContainerRef.current;
+      const svgEl       = connectorRef.current;
+      if (!protCardEl || !calloutCont || !svgEl) return;
+
+      const pathEl = svgEl.querySelector<SVGPathElement>('path');
       if (!pathEl) return;
 
-      const cardRect    = protCardEl.getBoundingClientRect();
-      const calloutRect = calloutRef.current.getBoundingClientRect();
-      const stageRect   = stage.getBoundingClientRect();
+      const cardRect  = protCardEl.getBoundingClientRect();
+      const stageRect = stage.getBoundingClientRect();
 
-      const x1 = cardRect.right  - stageRect.left;
-      const y1 = cardRect.top    + cardRect.height / 2 - stageRect.top;
-      const x2 = calloutRect.left - stageRect.left;
-      const y2 = calloutRect.top  + calloutRect.height / 2 - stageRect.top;
-      const cx = (x1 + x2) / 2;
-      pathEl.setAttribute('d', `M ${x1} ${y1} C ${cx} ${y1} ${cx} ${y2} ${x2} ${y2}`);
+      /* Start point: right edge of the protection card, vertically centred */
+      const x1 = cardRect.right - stageRect.left;
+      const y1 = cardRect.top + cardRect.height / 2 - stageRect.top;
+
+      /* Align callout to the card's centre before measuring its left edge */
+      calloutCont.style.top       = `${y1 + stageRect.top}px`;
+      calloutCont.style.transform = 'translateY(-50%)';
+
+      /* End point: left edge of callout container */
+      const calloutRect = calloutCont.getBoundingClientRect();
+      const x2 = calloutRect.left - stageRect.left - 8; // 8px gap before callout text
+
+      /* Gentle horizontal bezier (subtle S-shape) */
+      const dx  = x2 - x1;
+      const cpX = x1 + dx * 0.45;
+      pathEl.setAttribute('d',
+        `M ${x1} ${y1} C ${cpX} ${y1 + 3} ${cpX + dx * 0.1} ${y1 - 3} ${x2} ${y1}`
+      );
+
       try {
         const len = pathEl.getTotalLength();
-        pathEl.style.strokeDasharray = String(len);
-        gsap.set(pathEl, { strokeDashoffset: len });
-      } catch { /* not laid out yet */ }
+        pathEl.style.strokeDasharray = `${len}`;
+      } catch { /* SVG not laid out */ }
     };
 
-    /* ── ENTRY ANIMATION
-       Kept at top-level useGSAP (NOT inside mm.add) so StrictMode double-invoke
-       and media-query breakpoint transitions cannot interrupt a running entry.
-       mm.add only wraps the scroll timelines, which use immediateRender:false
-       and start at L.zoom — so there is zero interference with the entry.
-    ───────────────────────────────────────────────────────────────────────── */
+    /* ── ENTRY ANIMATION (top-level — NOT inside mm.add)
+       Kept outside matchMedia so neither StrictMode double-invoke nor
+       breakpoint transitions can interrupt a running entry animation.
+    ──────────────────────────────────────────────────────────────────────── */
     if (isDesktop) {
       const phone  = phoneRef.current;
       const s      = sRef.current;
@@ -114,36 +137,35 @@ export default function ExperienceStage({ containerRef }: { containerRef: React.
       const cue    = cueRef.current;
 
       if (phone && s && copy && card1 && card2 && card3 && cue) {
-        // GSAP owns positioning via xPercent/yPercent — no CSS transform needed
+        /* GSAP owns centering via xPercent/yPercent — no CSS transform on element */
         gsap.set(phone, { xPercent: -50, yPercent: -50, transformPerspective: 1100, transformOrigin: 'center center' });
         gsap.set(s,     { xPercent: -50, yPercent: -50, transformOrigin: 'center center' });
         gsap.set(copy,  { yPercent: -50 });
+        /* Callout hidden until Act 3 */
+        if (calloutContainerRef.current) gsap.set(calloutContainerRef.current, { opacity: 0 });
 
         if (window.scrollY > 10 || reduced) {
-          // Already scrolled or reduced-motion: show immediately at Frame-0
+          /* Already scrolled or reduced-motion: jump to frame-0 */
           gsap.set(phone, { opacity: 1, scale: 1, x: getPhoneX(), rotateY: -6, rotateX: 2, rotateZ: -.5 });
           gsap.set(s,     { opacity: 1, scale: 1, x: getPhoneX() });
           gsap.set(copy,  { opacity: 1, y: 0 });
           gsap.set([card1, card2, card3], { opacity: 1, x: 0, y: 0 });
           gsap.set(cue,   { opacity: .38 });
-          gsap.set(calloutRef.current!, { opacity: 0, x: 24 });
-          updateConnector();
         } else {
-          // Set initial state then animate in
+          /* Fade-in entry */
           gsap.set(phone,  { opacity: 0, scale: 1, x: getPhoneX(), rotateY: -6, rotateX: 2, rotateZ: -.5 });
           gsap.set(s,      { opacity: 0, scale: 1, x: getPhoneX() });
           gsap.set(copy,   { opacity: 0, y: 20 });
           gsap.set([card1, card2, card3], { opacity: 0, x: 0, y: 0 });
           gsap.set(cue,    { opacity: 0 });
-          gsap.set(calloutRef.current!, { opacity: 0, x: 24 });
 
-          gsap.timeline({ delay: .12, defaults: { ease: 'power2.out' },
-            onComplete: () => {
-              // Re-assert Frame-0 after entry so scroll TL fromVars have a clean reference
+          gsap.timeline({
+            delay: .12,
+            defaults: { ease: 'power2.out' },
+            onComplete() {
               gsap.set(phone, { opacity: 1, scale: 1, x: getPhoneX(), rotateY: -6, rotateX: 2, rotateZ: -.5 });
               gsap.set(s,     { opacity: 1, scale: 1, x: getPhoneX() });
               gsap.set([card1, card2, card3], { x: 0, y: 0 });
-              updateConnector();
             },
           })
             .to(s,     { opacity: 1, duration: .55 })
@@ -154,7 +176,7 @@ export default function ExperienceStage({ containerRef }: { containerRef: React.
         }
       }
     } else {
-      // Mobile entry
+      /* Mobile entry */
       const mPhone = mPhoneRef.current;
       const mCopy  = mCopyRef.current;
       const mCue   = mCueRef.current;
@@ -166,7 +188,6 @@ export default function ExperienceStage({ containerRef }: { containerRef: React.
         } else {
           gsap.set([mPhone, mCopy], { opacity: 0 });
           if (mCue) gsap.set(mCue, { opacity: 0 });
-
           gsap.timeline({ delay: .12, defaults: { ease: 'power2.out' } })
             .to(mCopy,  { opacity: 1, duration: .48 })
             .to(mPhone, { opacity: 1, duration: .45 }, '-=.20')
@@ -175,21 +196,22 @@ export default function ExperienceStage({ containerRef }: { containerRef: React.
       }
     }
 
-    /* ── SCROLL TIMELINES (inside mm.add — can be reverted on breakpoint change) */
+    /* ── SCROLL TIMELINES ─────────────────────────────────────────────────── */
     const mm = gsap.matchMedia();
 
-    /* ════════════════════════════════════ DESKTOP ════════════════════════ */
+    /* ══════════════════════════════════════════ DESKTOP ══════════════════ */
     mm.add('(min-width:1024px)', () => {
-      const phone  = phoneRef.current;
-      const s      = sRef.current;
-      const copy   = copyRef.current;
-      const card1  = card1Ref.current;
-      const card2  = card2Ref.current;
-      const card3  = card3Ref.current;
-      const cue    = cueRef.current;
-      const callout   = calloutRef.current;
-      const connector = connectorRef.current;
-      if (!phone || !s || !copy || !card1 || !card2 || !card3 || !cue || !callout || !connector) return;
+      const phone       = phoneRef.current;
+      const s           = sRef.current;
+      const copy        = copyRef.current;
+      const card1       = card1Ref.current;
+      const card2       = card2Ref.current;
+      const card3       = card3Ref.current;
+      const cue         = cueRef.current;
+      const calloutCont = calloutContainerRef.current;
+      const svgEl       = connectorRef.current;
+
+      if (!phone || !s || !copy || !card1 || !card2 || !card3 || !cue || !calloutCont || !svgEl) return;
 
       const scrollTl = gsap.timeline({
         scrollTrigger: {
@@ -197,7 +219,7 @@ export default function ExperienceStage({ containerRef }: { containerRef: React.
           pin:        stage,
           pinSpacing: true,
           ...ST_DESKTOP,
-          onRefresh: updateConnector,
+          onRefresh: updateConnectorGeometry,
         },
       });
 
@@ -217,9 +239,9 @@ export default function ExperienceStage({ containerRef }: { containerRef: React.
 
       if (reduced) return;
 
+      /* ── ACT 2 ────────────────────────────────────────────────────────── */
       const zoomDur = dur('zoom', 'zoomPeak');
 
-      // ACT 2 — copy exits, phone centres and scales, S parallax, cards scatter
       scrollTl.fromTo(copy,
         { opacity: 1, filter: 'blur(0px)', y: 0, immediateRender: false },
         { opacity: 0, filter: 'blur(8px)', y: -24, ease: 'power2.in', duration: zoomDur },
@@ -237,68 +259,142 @@ export default function ExperienceStage({ containerRef }: { containerRef: React.
 
       scrollTl.fromTo(card1,
         { x: 0, y: 0, opacity: 1, immediateRender: false },
-        { x: -72, y: -22, opacity: 0, ease: 'power2.in', duration: zoomDur * .72 },
-        'zoom');
+        { x: -72, y: -22, opacity: 0, ease: 'power2.in', duration: zoomDur * .72 }, 'zoom');
       scrollTl.fromTo(card2,
         { x: 0, y: 0, opacity: 1, immediateRender: false },
-        { x:  52, y: -32, opacity: 0, ease: 'power2.in', duration: zoomDur * .72 },
-        'zoom');
+        { x:  52, y: -32, opacity: 0, ease: 'power2.in', duration: zoomDur * .72 }, 'zoom');
       scrollTl.fromTo(card3,
         { x: 0, y: 0, opacity: 1, immediateRender: false },
-        { x:  58, y:  38, opacity: 0, ease: 'power2.in', duration: zoomDur * .8 },
-        'zoom');
+        { x:  58, y:  38, opacity: 0, ease: 'power2.in', duration: zoomDur * .8 },  'zoom');
 
       scrollTl.fromTo(cue,
         { opacity: .38, immediateRender: false },
-        { opacity: 0, ease: 'none', duration: .3 },
-        'zoom');
+        { opacity: 0, ease: 'none', duration: .3 }, 'zoom');
 
-      // ACT 3 — protection card highlights, rest dims, callout slides in, connector draws
-      const protCardEl   = phoneScreensRef.current?.protectionCardEl;
-      const screenContEl = phoneScreensRef.current?.screenContentEl;
+      /* ── ACT 3 — protection focus ─────────────────────────────────────
+         Timeline layout (L units):
+           2.9  protectionFocus ──[0.3]──  3.2  protectionLine
+                 secondaries dim, card grows, connector draws, callout reveals
 
-      if (protCardEl) {
-        scrollTl.fromTo(protCardEl,
-          { scale: 1, filter: 'brightness(1)', immediateRender: false },
-          { scale: 1.055, filter: 'brightness(1.10)', ease: 'power1.inOut', duration: dur('protectionFocus', 'protectionLine') },
+           3.2  protectionLine ──[0.3]──  3.5  protectionRead
+                 [reading stabilisation — connector fully drawn]
+
+           3.5  protectionRead ──[0.7]──  4.2  protectionExit
+                 [READING PAUSE — nothing moves]
+
+           4.2  protectionExit ──[0.3]──  4.5  sosFuture
+                 everything reverses cleanly
+      ───────────────────────────────────────────────────────────────────── */
+
+      /* Collect phone secondary elements (animated individually, not via a
+         parent brightness wrapper — prevents grey overlay on the phone screen) */
+      const greeting = phoneScreensRef.current?.greetingEl;
+      const counter  = phoneScreensRef.current?.counterEl;
+      const support  = phoneScreensRef.current?.supportEl;
+      const metrics  = phoneScreensRef.current?.metricsEl;
+      const nav      = phoneScreensRef.current?.navEl;
+      const protCard = phoneScreensRef.current?.protectionCardEl;
+      const titleEl  = calloutInnerRef.current?.titleEl;
+      const descEl   = calloutInnerRef.current?.descEl;
+
+      const secondaries = [greeting, counter, support, metrics, nav]
+        .filter((el): el is HTMLElement => !!el);
+
+      const focusDur = dur('protectionFocus', 'protectionLine'); // 0.3
+      const exitDur  = dur('protectionExit',  'sosFuture');      // 0.3
+
+      /* 1 — Secondary elements: selective contrast reduction.
+         opacity 0.40 + blur 0.6px = subtle desaturation, not a grey overlay.
+         Phone background (#f8fbfe) is unaffected — it's not a child of these elements. */
+      if (secondaries.length > 0) {
+        scrollTl.fromTo(secondaries,
+          { opacity: 1, filter: 'blur(0px)', immediateRender: false },
+          { opacity: 0.40, filter: 'blur(0.6px)', ease: 'power1.inOut', duration: focusDur },
           'protectionFocus');
-        scrollTl.to(protCardEl,
-          { scale: 1, filter: 'brightness(1)', ease: 'power1.out', duration: dur('protectionExit', 'sosFuture') },
+        scrollTl.to(secondaries,
+          { opacity: 1, filter: 'blur(0px)', ease: 'power1.out', duration: exitDur },
           'protectionExit');
       }
 
-      if (screenContEl) {
-        scrollTl.fromTo(screenContEl,
-          { filter: 'brightness(1)', immediateRender: false },
-          { filter: 'brightness(.60)', ease: 'power1.inOut', duration: dur('protectionFocus', 'protectionLine') },
+      /* 2 — Protection card: discrete growth.
+         zIndex 4 in ScreenHome JSX ensures it sits above its dimmed siblings.
+         No brightness filter — card stays at full white. */
+      if (protCard) {
+        scrollTl.fromTo(protCard,
+          { scale: 1, immediateRender: false },
+          { scale: 1.045, ease: 'power1.inOut', duration: focusDur },
           'protectionFocus');
-        scrollTl.to(screenContEl,
-          { filter: 'brightness(1)', ease: 'power1.out', duration: dur('protectionExit', 'sosFuture') },
+        scrollTl.to(protCard,
+          { scale: 1, ease: 'power1.out', duration: exitDur },
           'protectionExit');
       }
 
-      scrollTl.fromTo(callout,
-        { opacity: 0, x: 28, immediateRender: false },
-        { opacity: 1, x: 0, ease: 'power2.out', duration: dur('protectionFocus', 'protectionLine') },
-        'protectionFocus');
-      scrollTl.to(callout,
-        { opacity: 0, x: -16, ease: 'power2.in', duration: dur('protectionExit', 'sosFuture') * .7 },
-        'protectionExit');
-
-      const pathEl = connector.querySelector<SVGPathElement>('path');
+      /* 3 — Connector line.
+         The strokeDashoffset FROM value is a function. GSAP evaluates it when
+         the tween first activates (at protectionFocus label), meaning the phone
+         IS at scale 1.28, centred. getBoundingClientRect returns correct coords.
+         Side-effect: updateConnectorGeometry() also sets the callout's Y position. */
+      const pathEl = svgEl.querySelector<SVGPathElement>('path');
       if (pathEl) {
-        const strokeLen = () => { try { return pathEl.getTotalLength() || 120; } catch { return 120; } };
         scrollTl.fromTo(pathEl,
-          { strokeDashoffset: () => strokeLen(), opacity: 0, immediateRender: false },
-          { strokeDashoffset: 0, opacity: 1, ease: 'power2.inOut', duration: dur('protectionFocus', 'protectionLine') },
+          {
+            strokeDashoffset: () => {
+              updateConnectorGeometry();
+              return pathEl.getTotalLength() || 120;
+            },
+            opacity: 0,
+            immediateRender: false,
+          },
+          { strokeDashoffset: 0, opacity: 1, ease: 'power2.inOut', duration: focusDur },
           'protectionFocus');
+
         scrollTl.to(pathEl,
-          { opacity: 0, ease: 'power2.in', duration: dur('protectionExit', 'sosFuture') * .5 },
+          {
+            strokeDashoffset: () => pathEl.getTotalLength() || 120,
+            opacity: 0,
+            ease: 'power2.in',
+            duration: exitDur * 0.65,
+          },
           'protectionExit');
       }
+
+      /* 4 — Callout container: flip hidden→visible at Act-3 entry.
+         No opacity animation on the container — its children carry the reveal.
+         scrollTl.set() in a scrubbed TL is reversible. */
+      scrollTl.set(calloutCont, { opacity: 1 }, 'protectionFocus');
+      scrollTl.set(calloutCont, { opacity: 0 }, 'protectionExit+=0.22');
+
+      /* 5 — Callout title: blur-reveal */
+      if (titleEl) {
+        scrollTl.fromTo(titleEl,
+          { filter: 'blur(10px)', opacity: 0, immediateRender: false },
+          { filter: 'blur(0px)', opacity: 1, ease: 'power2.out', duration: focusDur * 0.85 },
+          'protectionFocus+=0.05');
+        scrollTl.to(titleEl,
+          { filter: 'blur(10px)', opacity: 0, ease: 'power2.in', duration: exitDur * 0.55 },
+          'protectionExit');
+      }
+
+      /* 6 — Callout description: blur-reveal, slight stagger after title */
+      if (descEl) {
+        scrollTl.fromTo(descEl,
+          { filter: 'blur(10px)', opacity: 0, immediateRender: false },
+          { filter: 'blur(0px)', opacity: 1, ease: 'power2.out', duration: focusDur * 0.85 },
+          'protectionFocus+=0.10');
+        scrollTl.to(descEl,
+          { filter: 'blur(10px)', opacity: 0, ease: 'power2.in', duration: exitDur * 0.55 },
+          'protectionExit+=0.04');
+      }
+
+      /* Anchor the timeline totalDuration to TOTAL_DURATION=10 so the scrub
+         maps scroll progress 0→100% to timeline 0→10, keeping all label
+         positions (L.zoom=1.4, L.protectionFocus=2.9 …) at the correct
+         scroll positions. Without this, totalDuration would be ~4.5 (the last
+         tween's end time) and protectionFocus would fire at the wrong scroll %. */
+      scrollTl.to(stage, { duration: 0 }, TOTAL_DURATION);
     });
 
-    /* ════════════════════════════════════ MOBILE ═════════════════════════ */
+    /* ══════════════════════════════════════════ MOBILE ═══════════════════ */
     mm.add('(max-width:1023px)', () => {
       const mPhone = mPhoneRef.current;
       const mCopy  = mCopyRef.current;
@@ -315,18 +411,40 @@ export default function ExperienceStage({ containerRef }: { containerRef: React.
       });
 
       scrollTl
-        .addLabel('zoom',     L.zoom)
-        .addLabel('zoomPeak', L.zoomPeak);
+        .addLabel('zoom',            L.zoom)
+        .addLabel('zoomPeak',        L.zoomPeak)
+        .addLabel('protectionFocus', L.protectionFocus)
+        .addLabel('protectionExit',  L.protectionExit);
 
+      /* Act 2: copy fades, phone scales */
       scrollTl.fromTo(mCopy,
         { opacity: 1, immediateRender: false },
-        { opacity: 0, ease: 'power2.in', duration: dur('zoom', 'zoomPeak') },
-        'zoom');
-
+        { opacity: 0, ease: 'power2.in', duration: dur('zoom', 'zoomPeak') }, 'zoom');
       scrollTl.fromTo(mPhone,
         { scale: 1, immediateRender: false },
-        { scale: 1.12, ease: 'power2.inOut', duration: dur('zoom', 'zoomPeak') },
-        'zoom');
+        { scale: 1.08, ease: 'power2.inOut', duration: dur('zoom', 'zoomPeak') }, 'zoom');
+
+      /* Act 3 mobile: skip connector/callout (no side space on mobile).
+         Just dim secondary elements for context focus. */
+      const greeting = phoneScreensRef.current?.greetingEl;
+      const counter  = phoneScreensRef.current?.counterEl;
+      const support  = phoneScreensRef.current?.supportEl;
+      const metrics  = phoneScreensRef.current?.metricsEl;
+      const nav      = phoneScreensRef.current?.navEl;
+      const secondaries = [greeting, counter, support, metrics, nav]
+        .filter((el): el is HTMLElement => !!el);
+
+      if (secondaries.length > 0) {
+        const focusDur = dur('protectionFocus', 'protectionLine');
+        const exitDur  = dur('protectionExit',  'sosFuture');
+        scrollTl.fromTo(secondaries,
+          { opacity: 1, immediateRender: false },
+          { opacity: 0.45, ease: 'power1.inOut', duration: focusDur }, 'protectionFocus');
+        scrollTl.to(secondaries,
+          { opacity: 1, ease: 'power1.out', duration: exitDur }, 'protectionExit');
+      }
+      /* Anchor mobile timeline to TOTAL_DURATION for correct scroll mapping */
+      scrollTl.to(mPhone, { duration: 0 }, TOTAL_DURATION);
     });
 
   }, { scope: containerRef });
@@ -343,6 +461,7 @@ export default function ExperienceStage({ containerRef }: { containerRef: React.
       {/* ═══════════════════════ DESKTOP ════════════════════════════════ */}
       <div className="hidden lg:block" style={{ position: 'absolute', inset: 0 }}>
 
+        {/* S letterform — z:1 */}
         <div
           ref={sRef}
           style={{ position: 'absolute', left: '50%', top: '50%', width: '38vh', zIndex: 1, pointerEvents: 'none', willChange: 'transform,opacity,filter' }}
@@ -350,6 +469,7 @@ export default function ExperienceStage({ containerRef }: { containerRef: React.
           <GlassS className="w-full h-full" />
         </div>
 
+        {/* Phone — z:3 */}
         <div
           ref={phoneRef}
           style={{ position: 'absolute', left: '50%', top: '50%', zIndex: 3, willChange: 'transform,opacity,filter' }}
@@ -359,20 +479,20 @@ export default function ExperienceStage({ containerRef }: { containerRef: React.
           </PhoneShell>
         </div>
 
+        {/* Copy — z:5 */}
         <div
           ref={copyRef}
           style={{
-            position: 'absolute',
-            left: 'var(--sb-gutter)', top: '50%',
+            position: 'absolute', left: 'var(--sb-gutter)', top: '50%',
             paddingTop: 'calc(var(--sb-nav-height)*.5)',
-            zIndex: 5,
-            maxWidth: 'min(38%,500px)',
+            zIndex: 5, maxWidth: 'min(38%,500px)',
             willChange: 'transform,opacity,filter',
           }}
         >
           <Act01Intro />
         </div>
 
+        {/* Floating cards — z:4 */}
         <div ref={card1Ref} style={{ position: 'absolute', top: '14%', left: '32%', zIndex: 4, willChange: 'transform,opacity' }}>
           <FloatingAppCard variant="protection" />
         </div>
@@ -383,31 +503,48 @@ export default function ExperienceStage({ containerRef }: { containerRef: React.
           <FloatingAppCard variant="support" />
         </div>
 
-        <div
-          ref={calloutRef}
-          style={{
-            position: 'absolute',
-            left: 'calc(50% + max(165px,14.2vw))',
-            top:  'calc(50% - 9vh)',
-            zIndex: 8,
-          }}
-        >
-          <Act03Protection />
-        </div>
+        {/* ── CALLOUT LAYER — outside PhoneShell entirely ──────────────── */}
 
+        {/* SVG connector — fills stage so no overflow clip can cut the line.
+            Path opacity starts at 0; GSAP animates it in Act 3. */}
         <svg
           ref={connectorRef}
           aria-hidden
-          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 7, overflow: 'visible' }}
+          style={{
+            position: 'absolute', inset: 0,
+            width: '100%', height: '100%',
+            pointerEvents: 'none',
+            zIndex: 6,
+            overflow: 'visible',
+          }}
         >
           <path
             fill="none"
-            stroke="rgba(49,138,199,.50)"
-            strokeWidth="1.5"
+            stroke="rgba(49,138,199,0.5)"
+            strokeWidth="1.2"
             strokeLinecap="round"
-            style={{ filter: 'drop-shadow(0 0 3px rgba(49,138,199,.28))' }}
+            style={{ opacity: 0 }}
           />
         </svg>
+
+        {/* Callout container — z:9 (above phone z:3 and S z:1).
+            top is set by updateConnectorGeometry to align with the card.
+            opacity starts at 0; scroll TL flips it at protectionFocus. */}
+        <div
+          ref={calloutContainerRef}
+          aria-hidden="true"
+          style={{
+            position: 'absolute',
+            left: 'calc(50% + max(178px, 14.5vw))',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            zIndex: 9,
+            opacity: 0,
+            pointerEvents: 'none',
+          }}
+        >
+          <Act03Protection ref={calloutInnerRef} />
+        </div>
 
         {/* Scroll cue */}
         <div
@@ -425,10 +562,7 @@ export default function ExperienceStage({ containerRef }: { containerRef: React.
         className="lg:hidden flex flex-col overflow-hidden"
         style={{ height: '100%', paddingTop: 'var(--sb-nav-height)' }}
       >
-        <div
-          ref={mCopyRef}
-          style={{ padding: '.875rem var(--sb-gutter) .5rem', willChange: 'opacity' }}
-        >
+        <div ref={mCopyRef} style={{ padding: '.875rem var(--sb-gutter) .5rem', willChange: 'opacity' }}>
           <Act01Intro compact />
         </div>
 
@@ -446,11 +580,7 @@ export default function ExperienceStage({ containerRef }: { containerRef: React.
           </div>
         </div>
 
-        <div
-          ref={mCueRef}
-          aria-hidden
-          style={{ display: 'flex', justifyContent: 'center', paddingBottom: '1rem' }}
-        >
+        <div ref={mCueRef} aria-hidden style={{ display: 'flex', justifyContent: 'center', paddingBottom: '1rem' }}>
           <span style={{ fontSize: '9px', fontWeight: 600, color: '#9ab0be', letterSpacing: '.22em', textTransform: 'uppercase' }}>Role</span>
         </div>
       </div>
