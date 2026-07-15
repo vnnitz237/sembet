@@ -1,0 +1,56 @@
+/* ─── SemBet Design Tokens ─────────────────────────────────────────────── */
+
+:root {
+  /* Background */
+  --sb-white: #ffffff;
+  --sb-background: #f8fbfe;
+  --sb-surface: rgba(255, 255, 255, 0.76);
+
+  /* Blue palette */
+  --sb-baby-blue: #c7e8ff;
+  --sb-light-blue: #8fcfff;
+  --sb-luminous: #5aade8;
+  --sb-action: #318ac7;
+  --sb-action-dark: #246a9e;
+
+  /* Typography */
+  --sb-heading: #172b3a;
+  --sb-body: #607789;
+  --sb-muted: #9ab0be;
+
+  /* Border */
+  --sb-border: #e2eef5;
+  --sb-border-subtle: #f0f6fb;
+
+  /* Focus ring */
+  --sb-focus: #318ac7;
+
+  /* Shadows */
+  --sb-shadow-sm: 0 1px 3px rgba(23, 43, 58, 0.06), 0 1px 2px rgba(23, 43, 58, 0.04);
+  --sb-shadow-md: 0 4px 16px rgba(49, 138, 199, 0.10), 0 1px 4px rgba(23, 43, 58, 0.06);
+  --sb-shadow-action: 0 4px 20px rgba(49, 138, 199, 0.22), 0 1px 4px rgba(49, 138, 199, 0.12);
+
+  /* Motion */
+  --sb-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --sb-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --sb-duration-micro: 220ms;
+  --sb-duration-base: 600ms;
+  --sb-duration-scene: 1000ms;
+
+  /* Layout */
+  --sb-nav-height: 72px;
+  --sb-container: 1280px;
+  --sb-gutter: clamp(20px, 5vw, 80px);
+
+  /* Radius */
+  --sb-radius-sm: 6px;
+  --sb-radius-md: 12px;
+  --sb-radius-lg: 20px;
+  --sb-radius-full: 9999px;
+
+  /* Z-index */
+  --sb-z-base: 1;
+  --sb-z-sticky: 10;
+  --sb-z-nav: 50;
+  --sb-z-overlay: 100;
+}

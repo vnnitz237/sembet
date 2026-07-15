@@ -1,17 +1,18 @@
-import HeroSection from './sections/HeroSection';
-import StorySection from './sections/StorySection';
-import ServicesSection from './sections/ServicesSection';
-import ProjectsSection from './sections/ProjectsSection';
+import FloatingNavbar from './components/navigation/FloatingNavbar';
+import Scene01Hero from './scenes/Scene01Hero';
 
-function App() {
+/*
+ * Old portfolio sections are preserved as files in src/sections/ for backup.
+ * They are intentionally not imported here.
+ */
+
+export default function App() {
   return (
-    <div className="bg-[#0C0C0C]" style={{ overflowX: 'clip' }}>
-      <HeroSection />
-      <StorySection />
-      <ServicesSection />
-      <ProjectsSection />
+    <div className="min-h-screen bg-sb-background overflow-x-hidden">
+      <FloatingNavbar />
+      <main id="main-content">
+        <Scene01Hero />
+      </main>
     </div>
   );
 }
-
-export default App;

@@ -1,3 +1,4 @@
+// @ts-nocheck — legacy portfolio backup, not used in SemBet
 import { useRef, useState, useMemo, Fragment, type CSSProperties } from 'react';
 import {
   motion,
@@ -292,7 +293,7 @@ function DataStreamParticle({
   );
 }
 
-function DataStreamLayer({ progress }: { progress: MotionValue<number> }) {
+function _DataStreamLayer({ progress }: { progress: MotionValue<number> }) {
   const layerOpacity = useTransform(progress, [0.86, 0.88], [0, 1]);
   return (
     <motion.div
