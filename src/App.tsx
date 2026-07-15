@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import FloatingNavbar from './components/navigation/FloatingNavbar';
-import Scene01Hero from './scenes/Scene01Hero';
+import SemBetExperience from './experience/SemBetExperience';
 
 /*
  * Old portfolio sections are preserved as files in src/sections/ for backup.
@@ -27,7 +27,7 @@ export default function App() {
     <div className="min-h-screen bg-sb-background overflow-x-hidden">
       <FloatingNavbar />
       <main id="main-content">
-        <Scene01Hero />
+        <SemBetExperience />
       </main>
     </div>
   );
