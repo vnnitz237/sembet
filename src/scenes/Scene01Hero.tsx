@@ -12,13 +12,7 @@ import FloatingAppCard from '../components/hero/FloatingAppCard';
 gsap.registerPlugin(ScrollTrigger);
 
 /* S spine — same path as GlassS, used for the light-sweep overlay */
-const S_PATH =
-  'M 196,62 C 220,32 198,20 158,20 ' +
-  'C 100,20 44,56 44,98 ' +
-  'C 44,140 90,164 134,182 ' +
-  'C 178,200 216,228 216,272 ' +
-  'C 216,314 176,322 128,322 ' +
-  'C 82,322 44,306 36,282';
+
 
 const GRAIN =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E" +
@@ -75,45 +69,6 @@ function SceneBackground() {
 }
 
 /* ── Light sweep — glowing stroke that traces the S ─────────────────────── */
-function LightSweep({ pathRef }: { pathRef: React.RefObject<SVGPathElement> }) {
-  return (
-    <svg
-      viewBox="0 0 260 340"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-hidden
-      style={{
-        position: 'absolute', inset: 0,
-        width: '100%', height: '100%',
-        overflow: 'visible', pointerEvents: 'none', zIndex: 2,
-      }}
-    >
-      <defs>
-        <linearGradient id="sb-sweep-g" x1="30" y1="20" x2="216" y2="320" gradientUnits="userSpaceOnUse">
-          <stop offset="0%"   stopColor="#ffffff"  stopOpacity="1.0" />
-          <stop offset="45%"  stopColor="#c7e8ff"  stopOpacity="0.9" />
-          <stop offset="100%" stopColor="#5aade8"  stopOpacity="0.0" />
-        </linearGradient>
-        <filter id="sb-sweep-f" x="-60%" y="-60%" width="220%" height="220%">
-          <feGaussianBlur stdDeviation="5" result="b" />
-          <feMerge>
-            <feMergeNode in="b" />
-            <feMergeNode in="SourceGraphic" />
-          </feMerge>
-        </filter>
-      </defs>
-      <path
-        ref={pathRef}
-        d={S_PATH}
-        stroke="url(#sb-sweep-g)"
-        strokeWidth="3.5"
-        fill="none"
-        strokeLinecap="round"
-        filter="url(#sb-sweep-f)"
-        opacity="0"
-      />
-    </svg>
-  );
-}
 
 /* ── Scroll cue ──────────────────────────────────────────────────────────── */
 function ScrollCue() {
@@ -205,136 +160,168 @@ export default function Scene01Hero() {
   const card1Ref   = useRef<HTMLDivElement>(null);
   const card2Ref   = useRef<HTMLDivElement>(null);
   const card3Ref   = useRef<HTMLDivElement>(null);
-  const sweepRef   = useRef<SVGPathElement>(null) as React.RefObject<SVGPathElement>;
   const cueRef     = useRef<HTMLDivElement>(null);
 
   useGSAP(() => {
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const section  = sectionRef.current;
+    const sticky   = stickyRef.current;
+    const sWrap    = sWrapRef.current;
+    const phone    = phoneRef.current;
+    const copy     = copyRef.current;
+    const card1    = card1Ref.current;
+    const card2    = card2Ref.current;
+    const card3    = card3Ref.current;
+    const cue      = cueRef.current;
+    if (!section || !sticky || !sWrap || !phone || !copy || !card1 || !card2 || !card3 || !cue) return;
 
-    if (reduced) {
-      gsap.set(
-        [sWrapRef.current, phoneRef.current, copyRef.current,
-          card1Ref.current, card2Ref.current, card3Ref.current, cueRef.current],
-        { opacity: 1, clearProps: 'filter,transform' },
+    const isDesktop = window.matchMedia('(min-width: 1024px)').matches;
+    const reduced   = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    /*
+     * ─────────────────────────────────────────────────────────────────────────
+     * STEP 1 — Centering via GSAP (owns all transforms; no CSS transform on
+     *          these elements, so nothing conflicts).
+     * ─────────────────────────────────────────────────────────────────────────
+     */
+    gsap.set(sWrap, { xPercent: -50, yPercent: -50, transformOrigin: 'center' });
+    gsap.set(phone, { xPercent: -50, yPercent: -50, transformOrigin: 'center' });
+    gsap.set(copy,  { yPercent: -50 });
+
+    /*
+     * ─────────────────────────────────────────────────────────────────────────
+     * STEP 2 — Deterministic FRAME-0 state.
+     *          This is the visual starting point for BOTH timelines.
+     *          All scroll-driven transforms start from these exact values.
+     * ─────────────────────────────────────────────────────────────────────────
+     */
+    const setFrame0 = () => {
+      gsap.set(sWrap,  { opacity: 1, scale: 1, filter: 'blur(0px)' });
+      gsap.set(phone,  { opacity: 1, scale: 1, y: 0 });
+      gsap.set(copy,   { opacity: 1, y: 0 });
+      gsap.set([card1, card2, card3], { opacity: 1, x: 0, y: 0 });
+      gsap.set(cue,    { opacity: 0.38 });
+    };
+
+    /*
+     * ─────────────────────────────────────────────────────────────────────────
+     * STEP 3 — Scroll-driven timeline (desktop only).
+     *          Built once; driven exclusively by ScrollTrigger scrub.
+     *          Uses fromTo() so start values are always explicit regardless
+     *          of when ST initialises.
+     * ─────────────────────────────────────────────────────────────────────────
+     */
+    const buildScrollTl = () => {
+      if (!isDesktop) return;
+
+      const scrollTl = gsap.timeline({
+        scrollTrigger: {
+          trigger: section,
+          pin: sticky,
+          pinSpacing: true,
+          start: 'top top',
+          end: '+=180%',
+          scrub: 1.2,
+          anticipatePin: 1,
+          invalidateOnRefresh: true,
+          markers: false,
+        },
+      });
+
+      /* All fromTo() — start values match Frame-0 exactly */
+
+      /* Copy: dissolves out (first 40% of scroll) */
+      scrollTl.fromTo(copy,
+        { opacity: 1, y: 0 },
+        { opacity: 0, y: -40, ease: 'power2.in', duration: 0.4 },
+        0,
       );
+
+      /* S: recedes — parallax plane 2 */
+      scrollTl.fromTo(sWrap,
+        { scale: 1, opacity: 1, filter: 'blur(0px)' },
+        { scale: 1.07, opacity: 0.32, filter: 'blur(2px)', ease: 'none', duration: 1 },
+        0,
+      );
+
+      /* Phone: approaches — parallax plane 3 */
+      scrollTl.fromTo(phone,
+        { scale: 1, y: 0 },
+        { scale: 1.1, y: -40, ease: 'none', duration: 1 },
+        0,
+      );
+
+      /* Cards: disperse — parallax plane 4 */
+      scrollTl.fromTo(card1,
+        { x: 0, y: 0, opacity: 1 },
+        { x: -80, y: -30, opacity: 0.2, ease: 'none', duration: 0.7 },
+        0,
+      );
+      scrollTl.fromTo(card2,
+        { x: 0, y: 0, opacity: 1 },
+        { x: 60, y: -40, opacity: 0.2, ease: 'none', duration: 0.7 },
+        0,
+      );
+      scrollTl.fromTo(card3,
+        { x: 0, y: 0, opacity: 1 },
+        { x: 65, y: 45, opacity: 0.2, ease: 'none', duration: 0.6 },
+        0,
+      );
+
+      /* Scroll cue: fades immediately */
+      scrollTl.fromTo(cue,
+        { opacity: 0.38 },
+        { opacity: 0, ease: 'none', duration: 0.1 },
+        0,
+      );
+    };
+
+    /*
+     * ─────────────────────────────────────────────────────────────────────────
+     * STEP 4 — Entry OR instant-show depending on scroll position at load.
+     * ─────────────────────────────────────────────────────────────────────────
+     */
+    const scrolledOnLoad = window.scrollY > 10;
+
+    if (reduced || scrolledOnLoad) {
+      /*
+       * prefers-reduced-motion OR page loaded/restored mid-scroll:
+       * Show Frame-0 immediately. ScrollTrigger syncs to current position.
+       */
+      setFrame0();
+      buildScrollTl();
       return;
     }
 
-    /* ── Set invisible initial states before first paint ── */
-    // xPercent/yPercent handle the -50% centering — no conflict with CSS transforms
-    gsap.set(sWrapRef.current, { xPercent: -50, yPercent: -50, opacity: 0, scale: 0.97, filter: 'blur(52px)', transformOrigin: 'center' });
-    gsap.set(phoneRef.current, { xPercent: -50, yPercent: -50, opacity: 0, scale: 0.88, filter: 'blur(28px)', transformOrigin: 'center' });
-    gsap.set(copyRef.current,  { yPercent: -50, opacity: 0, y: 32 });
-    gsap.set(card1Ref.current,  { opacity: 0, y: 18, x: -14 });
-    gsap.set(card2Ref.current,  { opacity: 0, y: -16, x: 14 });
-    gsap.set(card3Ref.current,  { opacity: 0, y: 20, x: 16 });
-    gsap.set(cueRef.current,    { opacity: 0 });
+    /*
+     * Fresh load at top of page:
+     * 1. Hide all elements.
+     * 2. Run short entry (~1.4s) — opacity + tiny translate only.
+     * 3. On complete: call setFrame0() (idempotent settle), then build scroll TL.
+     *
+     * Entry NEVER animates scale, x-position, or any property that
+     * the scroll TL also controls — zero property overlap.
+     */
+    gsap.set(sWrap,  { opacity: 0 });
+    gsap.set(phone,  { opacity: 0, y: 18 });
+    gsap.set(copy,   { opacity: 0, y: 20 });
+    gsap.set([card1, card2, card3], { opacity: 0 });
+    gsap.set(cue,    { opacity: 0 });
 
-    /* ── Init sweep stroke-dash ── */
-    if (sweepRef.current) {
-      const len = sweepRef.current.getTotalLength();
-      sweepRef.current.style.strokeDasharray  = `${len}`;
-      sweepRef.current.style.strokeDashoffset = `${len}`;
-      gsap.set(sweepRef.current, { opacity: 1 });
-    }
-
-    /* ── Entry timeline ── */
-    const tl = gsap.timeline({ delay: 0.2, defaults: { ease: 'power3.out' } });
-
-    tl
-      /* S materializes from fog */
-      .to(sWrapRef.current, { opacity: 0.55, filter: 'blur(26px)', scale: 0.985, duration: 0.88 })
-      /* S sharpens — glass crystallizes */
-      .to(sWrapRef.current, { opacity: 1, filter: 'blur(0px)', scale: 1, duration: 1.18, ease: 'power2.out' }, '-=0.26')
-      /* Light traces the contour */
-      .to(sweepRef.current, { strokeDashoffset: 0, duration: 1.38, ease: 'power1.inOut' }, '-=0.82')
-      /* Phone born inside the glass */
-      .to(phoneRef.current, { opacity: 1, filter: 'blur(0px)', scale: 1, duration: 1.08, ease: 'power2.out' }, '-=0.96')
-      /* Copy surfaces */
-      .to(copyRef.current, { opacity: 1, y: 0, duration: 0.82, ease: 'power2.out' }, '-=0.56')
-      /* Cards float in — staggered */
-      .to([card1Ref.current, card2Ref.current], { opacity: 1, y: 0, x: 0, duration: 0.72, stagger: 0.14, ease: 'power2.out' }, '-=0.36')
-      .to(card3Ref.current, { opacity: 1, y: 0, x: 0, duration: 0.62, ease: 'power2.out' }, '-=0.40')
-      /* Scroll cue breathes in */
-      .to(cueRef.current, { opacity: 0.38, duration: 0.72 }, '-=0.18')
-      /* Release expensive will-change after entry completes */
-      .call(() => {
-        if (sWrapRef.current) sWrapRef.current.style.willChange = 'transform, opacity';
-        if (phoneRef.current) phoneRef.current.style.willChange = 'transform, opacity';
-      });
-
-    /* ── Scroll animations — desktop only ── */
-    const mm = gsap.matchMedia();
-    mm.add('(min-width: 1024px)', () => {
-      /* Pin hero for 180vh of scroll */
-      ScrollTrigger.create({
-        trigger: sectionRef.current,
-        pin: stickyRef.current,
-        pinSpacing: true,
-        start: 'top top',
-        end: '+=180%',
-        anticipatePin: 1,
-      });
-
-      /* Copy dissolves early — first 42% of scroll travel */
-      gsap.to(copyRef.current, {
-        opacity: 0, y: -44,
-        ease: 'power2.in',
-        scrollTrigger: {
-          trigger: sectionRef.current,
-          start: 'top top',
-          end: '+=42%',
-          scrub: 1.9,
-        },
-      });
-
-      /* S recedes — parallax plane 2 */
-      gsap.to(sWrapRef.current, {
-        scale: 1.07, opacity: 0.32, filter: 'blur(2px)',
-        ease: 'none',
-        scrollTrigger: {
-          trigger: sectionRef.current,
-          start: 'top top',
-          end: '+=130%',
-          scrub: 2.8,
-        },
-      });
-
-      /* Phone approaches — parallax plane 3 */
-      gsap.to(phoneRef.current, {
-        scale: 1.12, y: -44,
-        ease: 'none',
-        scrollTrigger: {
-          trigger: sectionRef.current,
-          start: 'top top',
-          end: '+=130%',
-          scrub: 2.2,
-        },
-      });
-
-      /* Cards disperse — parallax plane 4 */
-      gsap.to(card1Ref.current, {
-        x: '-5vw', y: '-3vh', opacity: 0.20,
-        ease: 'none',
-        scrollTrigger: { trigger: sectionRef.current, start: 'top top', end: '+=88%', scrub: 1.6 },
-      });
-      gsap.to(card2Ref.current, {
-        x: '4vw', y: '-4.5vh', opacity: 0.20,
-        ease: 'none',
-        scrollTrigger: { trigger: sectionRef.current, start: 'top top', end: '+=88%', scrub: 1.6 },
-      });
-      gsap.to(card3Ref.current, {
-        x: '4.5vw', y: '4.5vh', opacity: 0.20,
-        ease: 'none',
-        scrollTrigger: { trigger: sectionRef.current, start: 'top top', end: '+=72%', scrub: 1.4 },
-      });
-
-      /* Scroll cue fades quickly */
-      gsap.to(cueRef.current, {
-        opacity: 0,
-        scrollTrigger: { trigger: sectionRef.current, start: 'top top', end: '+=12%', scrub: 1 },
-      });
+    const entry = gsap.timeline({
+      delay: 0.15,
+      defaults: { ease: 'power2.out' },
+      onComplete() {
+        setFrame0();
+        buildScrollTl();
+      },
     });
+
+    entry
+      .to(sWrap, { opacity: 1, duration: 0.55 })
+      .to(phone, { opacity: 1, y: 0, duration: 0.50 }, '-=0.20')
+      .to(copy,  { opacity: 1, y: 0, duration: 0.45 }, '-=0.22')
+      .to([card1, card2, card3], { opacity: 1, duration: 0.40, stagger: 0.08 }, '-=0.18')
+      .to(cue, { opacity: 0.38, duration: 0.30 }, '-=0.10');
 
   }, { scope: sectionRef });
 
@@ -373,7 +360,6 @@ export default function Scene01Hero() {
             }}
           >
             <GlassS className="w-full h-full" />
-            <LightSweep pathRef={sweepRef} />
           </div>
 
           {/* Phone — born inside the S */}
