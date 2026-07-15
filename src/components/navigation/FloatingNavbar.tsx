@@ -37,13 +37,23 @@ export default function FloatingNavbar() {
           className="flex items-center gap-2.5 flex-shrink-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sb-action focus-visible:outline-offset-3 rounded-sb-sm"
           aria-label="SemBet — página inicial"
         >
-          {/* Provisional "S" mark — will be replaced by GlassS in Etapa 3 */}
-          <span
+          {/* Compact S mark — simplified SVG, related to GlassS but legible at small size */}
+          <svg
+            width="30"
+            height="30"
+            viewBox="0 0 30 30"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
             aria-hidden="true"
-            className="w-8 h-8 rounded-[10px] bg-sb-action flex items-center justify-center flex-shrink-0"
           >
-            <span className="text-white font-bold text-base leading-none select-none">S</span>
-          </span>
+            <rect width="30" height="30" rx="9" fill="#318AC7" />
+            <path
+              d="M 21,9.5 C 21,7.2 19,6 16.5,6 C 12.5,6 9,8.2 9,11.8 C 9,15 12,16.4 14.8,17.6 C 17.6,18.8 21,20.2 21,24 C 21,26.5 18.5,26.8 16,26.8 C 13,26.8 10.2,25.4 9,24"
+              stroke="white"
+              strokeWidth="2.4"
+              strokeLinecap="round"
+            />
+          </svg>
           <span className="text-sb-heading font-bold text-[15px] tracking-tight leading-none select-none">
             SemBet
           </span>
