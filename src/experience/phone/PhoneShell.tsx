@@ -1,4 +1,6 @@
 import { forwardRef } from 'react';
+import PhoneCanvas from '../../three/PhoneCanvas';
+import PhoneModel from '../../three/PhoneModel';
 
 interface PhoneShellProps {
   children: React.ReactNode;
@@ -20,19 +22,10 @@ const PhoneShell = forwardRef<HTMLDivElement, PhoneShellProps>(({ children }, re
       position: 'relative',
     }}
   >
-    {/* Chassis */}
-    <div
-      aria-hidden="true"
-      style={{
-        position: 'absolute',
-        inset: 0,
-        borderRadius: 'clamp(34px, 4vw, 44px)',
-        background: 'linear-gradient(145deg, #dde9f4 0%, #c6d8ea 60%, #b8cfe4 100%)',
-        boxShadow:
-          '0 40px 80px rgba(23,43,58,0.22), 0 10px 28px rgba(49,138,199,0.14), inset 0 1px 0 rgba(255,255,255,0.75)',
-        border: '1.5px solid rgba(49,138,199,0.08)',
-      }}
-    />
+    {/* Chassis — GLB phone model replacing the previous CSS mockup */}
+    <PhoneCanvas>
+      <PhoneModel />
+    </PhoneCanvas>
 
     {/* Screen area */}
     <div
